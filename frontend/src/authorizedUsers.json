@@ -1,0 +1,22 @@
+[
+  {
+    "email": "deepjoshi@gmail.com",
+    "password": "deep123",
+    "name": "Deep Joshi"
+  },
+  {
+    "email": "atharv@gmail.com",
+    "password": "atharv123",
+    "name": "Atharv Wadekar"
+  },
+  {
+    "email": "kishor.ghangale@trueinsight.in",
+    "password": "kishor123",
+    "name": "kishor ghangale "
+  },
+  {
+    "email": "admin@ecomatrix.com",
+    "password": "AdminPassword1!",
+    "name": "Admin"
+  }
+]
