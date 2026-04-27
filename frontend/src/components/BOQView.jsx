@@ -611,11 +611,12 @@ export default function BOQView({ floors, rccSettings, concreteEol, setConcreteE
     };
 
     return (
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-900 pb-32">
-            <div className="max-w-7xl mx-auto">
-                <div className="flex justify-between items-start mb-6">
+        <div className="w-full h-full bg-slate-900 text-slate-200 overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-800 bg-slate-900 sticky top-0 z-10">
+                <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-2xl font-bold text-white tracking-tight mb-2">Cost Estimation [V2]</h1>
+                        <h1 className="text-2xl font-bold text-white mb-1">Cost Estimation [V2]</h1>
                         <p className="text-slate-400 text-sm">Concrete, steel reinforcement & project cost — per floor & layer.</p>
                     </div>
                     <button onClick={generateCSV} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition text-white border border-slate-700">
@@ -623,7 +624,10 @@ export default function BOQView({ floors, rccSettings, concreteEol, setConcreteE
                         Export CSV
                     </button>
                 </div>
+            </div>
 
+            <div className="flex-1 overflow-y-auto p-6">
+                <div className="max-w-7xl mx-auto pb-32">
                 {/* Cost Table Save/Load */}
                 <div className="mt-3 flex items-center gap-2 flex-wrap">
                     {Object.keys(savedTables).length > 0 && (
@@ -1602,6 +1606,7 @@ export default function BOQView({ floors, rccSettings, concreteEol, setConcreteE
                         </div>
                     );
                 })()}
+            </div>
             </div>
         </div>
     );

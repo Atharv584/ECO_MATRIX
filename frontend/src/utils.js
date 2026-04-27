@@ -249,8 +249,15 @@ export const calculateMeasurements = (layers, config, rccSettings = {}) => {
                 const excavationDepth = layerConfig.depth !== undefined ? layerConfig.depth : 1.5;
                 const perimeter_M = calculatedLen * scaleToMeters;
                 const area_M2 = calculatedArea * areaScale;
-                // Add 1m offset on all sides -> area increases by perimeter * 1 + 4 (for 4 square corners)
-                const excavationArea_M2 = area_M2 + (perimeter_M * 1) + 4;
+                
+                // padding P
+                let P = 0.6; // 600mm for depth <= 3m
+                if (excavationDepth > 3) {
+                    P = 0.6 + 0.05 * (excavationDepth - 3); // +50mm for every 1m increase
+                }
+                
+                // New area with padding P: Area + Perimeter * P + 4 * P^2 (for corners)
+                const excavationArea_M2 = area_M2 + (perimeter_M * P) + (4 * P * P);
                 extraExcavationVolume += excavationArea_M2 * excavationDepth * numFloors;
             }
 
