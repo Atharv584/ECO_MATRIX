@@ -118,6 +118,9 @@ export default function BOQView({ floors, rccSettings, concreteEol, setConcreteE
     // Excavation
     const [excavationRate, setExcavationRate] = useState(() => getStored('excavationRate', 0));
 
+    // Shuttering
+    const [shutteringRates, setShutteringRates] = useState(() => getStored('shutteringRates', { column: 0, beam: 0, slab: 0 }));
+
     // Collapsed floor sections
     const [collapsedFloors, setCollapsedFloors] = useState(() => getStored('collapsedFloors', {}));
     const toggleFloor = (idx) => setCollapsedFloors(prev => ({ ...prev, [idx]: !prev[idx] }));
@@ -149,12 +152,13 @@ export default function BOQView({ floors, rccSettings, concreteEol, setConcreteE
         localStorage.setItem('ecomatrix_boq_draft_v2_elecRunningLength', JSON.stringify(elecRunningLength));
         localStorage.setItem('ecomatrix_boq_draft_v2_elecRate', JSON.stringify(elecRate));
         localStorage.setItem('ecomatrix_boq_draft_v2_excavationRate', JSON.stringify(excavationRate));
+        localStorage.setItem('ecomatrix_boq_draft_v2_shutteringRates', JSON.stringify(shutteringRates));
         localStorage.setItem('ecomatrix_boq_draft_v2_collapsedFloors', JSON.stringify(collapsedFloors));
         localStorage.setItem('ecomatrix_boq_draft_v2_extPaintRate', JSON.stringify(extPaintRate));
         localStorage.setItem('ecomatrix_boq_draft_v2_intPaintRate', JSON.stringify(intPaintRate));
         localStorage.setItem('ecomatrix_boq_draft_v2_waterproofRate', JSON.stringify(waterproofRate));
         localStorage.setItem('ecomatrix_boq_draft_v2_plasterRate', JSON.stringify(plasterRate));
-    }, [fittingRates, qtyOverrides, layerConcreteGrades, layerSteelGrades, layerConcreteEol, layerSteelEol, layerSteelPercent, steelGradeRates, concreteGradeRates, paintRate, columnExposure, slabTileSize, wcTileSize, slabTileRate, slabSkirtingHeight, slabSkirtingRate, wcTileRate, collapsedFloors, extPaintRate, intPaintRate, waterproofRate, plasterRate, wcSkirtingHeight, wcSkirtingTileRate, wcPaintRate, wcWaterproofRate, elecPointsPerFloor, elecRunningLength, elecRate, excavationRate]);
+    }, [fittingRates, qtyOverrides, layerConcreteGrades, layerSteelGrades, layerConcreteEol, layerSteelEol, layerSteelPercent, steelGradeRates, concreteGradeRates, paintRate, columnExposure, slabTileSize, wcTileSize, slabTileRate, slabSkirtingHeight, slabSkirtingRate, wcTileRate, collapsedFloors, extPaintRate, intPaintRate, waterproofRate, plasterRate, wcSkirtingHeight, wcSkirtingTileRate, wcPaintRate, wcWaterproofRate, elecPointsPerFloor, elecRunningLength, elecRate, excavationRate, shutteringRates]);
 
     // Bulk assignment state with floor range
     const [bulkConcreteGrade, setBulkConcreteGrade] = useState('');
@@ -254,12 +258,13 @@ export default function BOQView({ floors, rccSettings, concreteEol, setConcreteE
                 const area = parseFloat(stats.area) || 0;
                 const totalSA = parseFloat(stats.surfaceArea) || 0;
                 const lateralSA = Math.max(0, totalSA - 2 * area);
+                const shutteringArea = parseFloat(stats.shutteringArea) || 0;
 
                 if (CONCRETE_ROLES.includes(role) || MASONRY_ROLES.includes(role)) {
                     items.push({
                         floorIdx, floorName: floor.name || defaultName,
                         layerId: layer.id, layerName: layer.name || layer.id,
-                        role, volume, area, surfaceArea: lateralSA,
+                        role, volume, area, surfaceArea: lateralSA, shutteringArea,
                         count: layer.entities?.length || 0,
                     });
                     // Paint aggregation
@@ -316,6 +321,7 @@ export default function BOQView({ floors, rccSettings, concreteEol, setConcreteE
                                 volume: parseFloat(stats.volume) || 0,
                                 area: parseFloat(stats.area) || 0,
                                 surfaceArea: Math.max(0, parseFloat(stats.surfaceArea) - 2 * parseFloat(stats.area)),
+                                shutteringArea: parseFloat(stats.shutteringArea) || 0,
                                 count: layer.entities?.length || 0,
                             });
                             paintAgg.slab += parseFloat(stats.area) || 0;
@@ -1471,6 +1477,99 @@ export default function BOQView({ floors, rccSettings, concreteEol, setConcreteE
                     );
                 })()}
 
+                {/* ── Shuttering Estimate ── */}
+                {(() => {
+                    const shutteringFloors = {};
+                    let totalColArea = 0, totalBeamArea = 0, totalSlabArea = 0;
+                    detailedItems.forEach(item => {
+                        if (['column', 'beam', 'slab'].includes(item.role)) {
+                            if (!shutteringFloors[item.floorIdx]) {
+                                shutteringFloors[item.floorIdx] = { floorName: item.floorName, column: 0, beam: 0, slab: 0 };
+                            }
+                            shutteringFloors[item.floorIdx][item.role] += (item.shutteringArea || 0);
+                            if (item.role === 'column') totalColArea += (item.shutteringArea || 0);
+                            if (item.role === 'beam') totalBeamArea += (item.shutteringArea || 0);
+                            if (item.role === 'slab') totalSlabArea += (item.shutteringArea || 0);
+                        }
+                    });
+                    
+                    const colCost = totalColArea * (shutteringRates.column || 0);
+                    const beamCost = totalBeamArea * (shutteringRates.beam || 0);
+                    const slabCost = totalSlabArea * (shutteringRates.slab || 0);
+                    const grandShutteringCost = colCost + beamCost + slabCost;
+                    
+                    if (totalColArea + totalBeamArea + totalSlabArea === 0) return null;
+
+                    return (
+                        <section>
+                            <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                                <span className="w-1.5 h-6 bg-teal-500 rounded-full"></span>
+                                Shuttering Estimate
+                            </h2>
+                            <div className="flex flex-wrap items-center gap-4 mb-3 bg-slate-800/40 p-3 rounded-lg border border-slate-700/40">
+                                <div className="flex items-center gap-1">
+                                    <span className="text-slate-400 text-xs">Column Rate:</span>
+                                    <span className="text-slate-500 text-xs">₹</span>
+                                    <input type="number" value={shutteringRates.column || 0} onChange={e => setShutteringRates(p => ({...p, column: parseFloat(e.target.value) || 0}))}
+                                        className="w-16 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-right text-white font-mono outline-none focus:border-teal-500 transition text-xs" />
+                                    <span className="text-slate-500 text-xs">/m²</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-slate-400 text-xs">Beam Rate:</span>
+                                    <span className="text-slate-500 text-xs">₹</span>
+                                    <input type="number" value={shutteringRates.beam || 0} onChange={e => setShutteringRates(p => ({...p, beam: parseFloat(e.target.value) || 0}))}
+                                        className="w-16 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-right text-white font-mono outline-none focus:border-teal-500 transition text-xs" />
+                                    <span className="text-slate-500 text-xs">/m²</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-slate-400 text-xs">Slab Rate:</span>
+                                    <span className="text-slate-500 text-xs">₹</span>
+                                    <input type="number" value={shutteringRates.slab || 0} onChange={e => setShutteringRates(p => ({...p, slab: parseFloat(e.target.value) || 0}))}
+                                        className="w-16 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-right text-white font-mono outline-none focus:border-teal-500 transition text-xs" />
+                                    <span className="text-slate-500 text-xs">/m²</span>
+                                </div>
+                            </div>
+                            
+                            <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl overflow-hidden">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="text-xs text-slate-500 border-b border-slate-700/50 bg-slate-800/60">
+                                            <th className="py-3 px-4 font-medium uppercase tracking-wider">Floor</th>
+                                            <th className="py-3 px-4 font-medium uppercase tracking-wider text-right">Column Area</th>
+                                            <th className="py-3 px-4 font-medium uppercase tracking-wider text-right">Beam Area</th>
+                                            <th className="py-3 px-4 font-medium uppercase tracking-wider text-right">Slab Area</th>
+                                            <th className="py-3 px-4 font-medium uppercase tracking-wider text-right">Floor Cost (₹)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {Object.values(shutteringFloors).map((f, i) => {
+                                            const fCost = f.column * (shutteringRates.column || 0) + f.beam * (shutteringRates.beam || 0) + f.slab * (shutteringRates.slab || 0);
+                                            return (
+                                                <tr key={i} className="border-b border-slate-700/20 last:border-0 hover:bg-slate-700/10 transition">
+                                                    <td className="py-3 px-4 text-sm font-medium text-slate-300">{f.floorName}</td>
+                                                    <td className="py-3 px-4 text-sm text-right text-slate-400 font-mono">{fmt(f.column)} m²</td>
+                                                    <td className="py-3 px-4 text-sm text-right text-slate-400 font-mono">{fmt(f.beam)} m²</td>
+                                                    <td className="py-3 px-4 text-sm text-right text-slate-400 font-mono">{fmt(f.slab)} m²</td>
+                                                    <td className="py-3 px-4 text-sm text-right text-teal-300 font-mono font-medium">{fmtCurrency(fCost)}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                    <tfoot className="bg-teal-900/20 border-t border-teal-500/30">
+                                        <tr>
+                                            <td className="py-3 px-4 text-sm font-bold text-teal-200">TOTAL</td>
+                                            <td className="py-3 px-4 text-sm text-right text-slate-300 font-mono font-bold">{fmt(totalColArea)} m²</td>
+                                            <td className="py-3 px-4 text-sm text-right text-slate-300 font-mono font-bold">{fmt(totalBeamArea)} m²</td>
+                                            <td className="py-3 px-4 text-sm text-right text-slate-300 font-mono font-bold">{fmt(totalSlabArea)} m²</td>
+                                            <td className="py-3 px-4 text-right font-mono text-xl font-bold text-white">{fmtCurrency(grandShutteringCost)}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </section>
+                    );
+                })()}
+
                 {/* ── Grand Total ── */}
                 {(() => {
                     const allWallArea = aggregatedPaint.wall + aggregatedPaint.brick_wall;
@@ -1487,11 +1586,19 @@ export default function BOQView({ floors, rccSettings, concreteEol, setConcreteE
                     const numFloors = floors.length || 1;
                     const elecCostGrand = elecPointsPerFloor * numFloors * elecRunningLength * elecRate;
 
+                    let tColArea = 0, tBeamArea = 0, tSlabArea = 0;
+                    detailedItems.forEach(item => {
+                        if (item.role === 'column') tColArea += (item.shutteringArea || 0);
+                        if (item.role === 'beam') tBeamArea += (item.shutteringArea || 0);
+                        if (item.role === 'slab') tSlabArea += (item.shutteringArea || 0);
+                    });
+                    const shutteringCostGrand = tColArea * (shutteringRates.column || 0) + tBeamArea * (shutteringRates.beam || 0) + tSlabArea * (shutteringRates.slab || 0);
+
                     return (
                         <div className="bg-gradient-to-r from-emerald-900/30 to-orange-900/30 border border-emerald-500/20 p-5 rounded-xl flex items-center justify-between mt-6">
                             <span className="font-bold text-lg text-white">ESTIMATED PROJECT COST</span>
                             <span className="font-mono text-3xl font-bold text-white">
-                                {fmtCurrency(totalConcreteCost + totalSteelCost + totalPaintCost + waterproofCostGrand + plasterCostGrand + totalTilingCost + elecCostGrand)}
+                                {fmtCurrency(totalConcreteCost + totalSteelCost + totalPaintCost + waterproofCostGrand + plasterCostGrand + totalTilingCost + elecCostGrand + shutteringCostGrand)}
                             </span>
                         </div>
                     );

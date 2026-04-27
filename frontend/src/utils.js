@@ -74,6 +74,7 @@ export const calculateMeasurements = (layers, config, rccSettings = {}) => {
         let layerArea = 0;
         let layerVolume = 0;
         let layerSurfaceArea = 0;
+        let layerShutteringArea = 0;
 
         const extrusion = layerConfig.extrusion || 0;
         const role = layerConfig.role || 'generic';
@@ -200,6 +201,25 @@ export const calculateMeasurements = (layers, config, rccSettings = {}) => {
             if (effectiveHeight > 0) {
                 layerVolume += calculatedArea * effectiveHeight;
                 layerSurfaceArea += (2 * calculatedArea) + (calculatedLen * effectiveHeight);
+                
+                // --- SHUTTERING AREA CALCULATION ---
+                let shutteringForEntity = 0;
+                if (role === 'column') {
+                    // Perimeter x Height
+                    shutteringForEntity = calculatedLen * effectiveHeight;
+                } else if (role === 'slab') {
+                    // L x B (Area)
+                    shutteringForEntity = calculatedArea;
+                } else if (role === 'beam') {
+                    // (2D + B) x L  =>  Area + 2 * L * Depth
+                    // We can estimate L and B from Area and Perimeter
+                    const P = calculatedLen;
+                    const A = calculatedArea;
+                    const discriminant = Math.max(0, (P/2) * (P/2) - 4 * A);
+                    const L = (P/2 + Math.sqrt(discriminant)) / 2;
+                    shutteringForEntity = A + 2 * L * effectiveHeight;
+                }
+                layerShutteringArea += shutteringForEntity;
             }
 
             // --- EXTRA WALL CALCULATION (Lintels/Sills) ---
@@ -241,7 +261,8 @@ export const calculateMeasurements = (layers, config, rccSettings = {}) => {
             length: (layerLength * scaleToMeters).toFixed(3),
             area: (layerArea * areaScale).toFixed(3),
             volume: (layerVolume * volScale).toFixed(3),
-            surfaceArea: (layerSurfaceArea * areaScale).toFixed(3)
+            surfaceArea: (layerSurfaceArea * areaScale).toFixed(3),
+            shutteringArea: (layerShutteringArea * areaScale).toFixed(3)
         };
 
         if (layerConfig?.visible !== false) {
