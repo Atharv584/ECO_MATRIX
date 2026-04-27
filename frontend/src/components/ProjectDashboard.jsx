@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { Loader2, Plus, GripVertical, Settings, Settings2, CheckCircle2, Copy, FilePlus, Layers, Trash2, Eye, EyeOff, Upload as UploadIcon, ChevronDown, ChevronRight } from 'lucide-react';
+import { Loader2, Plus, GripVertical, Settings, Settings2, CheckCircle2, Copy, FilePlus, Layers, Trash2, Eye, EyeOff, Upload as UploadIcon, Download, ChevronDown, ChevronRight } from 'lucide-react';
 import { ROLE_COLORS, API_BASE_URL } from '../utils';
 
 export default function ProjectDashboard({ floors, setFloors, rccSettings, setRccSettings, onUpload, updateFloorConfig, copyFloor, foundation, setFoundation }) {
@@ -7,6 +7,39 @@ export default function ProjectDashboard({ floors, setFloors, rccSettings, setRc
     const [uploadTarget, setUploadTarget] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
     const [expandedFloors, setExpandedFloors] = useState({ 0: true }); // Default first floor open
+
+    // --- Project Export/Import ---
+    const importInputRef = useRef(null);
+    const handleExportProject = () => {
+        const projectData = { version: '1.0', floors, foundation, rccSettings };
+        const blob = new Blob([JSON.stringify(projectData)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `EcoMatrix_Project_${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleImportProject = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const data = JSON.parse(event.target.result);
+                if (data.floors) setFloors(data.floors);
+                if (data.foundation !== undefined) setFoundation(data.foundation);
+                if (data.rccSettings) setRccSettings(data.rccSettings);
+            } catch (err) {
+                alert("Failed to parse project file. Make sure it's a valid JSON.");
+            }
+        };
+        reader.readAsText(file);
+        if (importInputRef.current) importInputRef.current.value = '';
+    };
 
     // --- File Upload Logic (from Sidebar) ---
     const triggerUpload = (target) => {
@@ -81,14 +114,23 @@ export default function ProjectDashboard({ floors, setFloors, rccSettings, setRc
             )}
             {/* Hidden Input for Uploads */}
             <input type="file" accept=".dxf" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+            <input type="file" accept=".json" ref={importInputRef} onChange={handleImportProject} className="hidden" />
 
             {/* LEFT PANEL: Setup & Floors */}
             <div className="w-80 flex flex-col border-r border-slate-800 bg-slate-900/50">
-                <div className="p-4 border-b border-slate-800">
+                <div className="p-4 border-b border-slate-800 flex justify-between items-center">
                     <h2 className="text-lg font-bold flex items-center gap-2 text-white">
                         <Settings size={18} className="text-blue-400" />
                         Configuration
                     </h2>
+                    <div className="flex gap-2">
+                        <button onClick={() => importInputRef.current?.click()} className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded transition border border-slate-700" title="Import Project">
+                            <UploadIcon size={16} />
+                        </button>
+                        <button onClick={handleExportProject} className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded transition border border-slate-700" title="Export Project">
+                            <Download size={16} />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
