@@ -1498,7 +1498,7 @@ export default function BOQView({ floors, rccSettings, concreteEol, setConcreteE
                     const slabCost = totalSlabArea * (shutteringRates.slab || 0);
                     const grandShutteringCost = colCost + beamCost + slabCost;
                     
-                    if (totalColArea + totalBeamArea + totalSlabArea === 0) return null;
+                    if (floors.length === 0 && !foundation) return null;
 
                     return (
                         <section>
